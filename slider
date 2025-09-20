@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Кейс №3 — Слайдер изображений (vanilla JS)</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --fg: #0f1115;
+      --muted: #596273;
+      --card: #ffffff;
+      --accent: #1f6feb;
+      --shadow: 0 10px 30px rgba(0,0,0,.08);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; padding: 24px; background: var(--bg); color: var(--fg);
+      font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+      display: grid; place-items: center;
+    }
+    .wrap { width: min(920px, 100%); }
+    h1 { margin: 0 0 14px; font-size: 20px; font-weight: 700; }
+    .slider {
+      display: grid; grid-template-columns: 64px 1fr 64px; gap: 12px; align-items: center;
+    }
+    .viewport {
+      background: var(--card); border: 1px solid #e6e9f2; border-radius: var(--radius);
+      box-shadow: var(--shadow); overflow: hidden; position: relative;
+      aspect-ratio: 16/9; display: grid; place-items: center;
+    }
+    .viewport img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .nav {
+      height: 56px; width: 64px; border: none; border-radius: 14px; cursor: pointer;
+      background: var(--fg); color: #fff; font-size: 24px; line-height: 1; box-shadow: var(--shadow);
+      transition: transform .08s ease, filter .2s ease; user-select: none;
+    }
+    .nav:active { transform: translateY(1px); }
+    .nav:focus-visible { outline: 3px solid #99c2ff; outline-offset: 2px; }
+    @media (hover:hover) { .nav:hover { filter: brightness(1.1); } }
+
+    .counter { margin: 12px 0 0; color: var(--muted); font-size: 14px; text-align: center; }
+    .dots { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #cfd6e4; }
+    .dot.active { background: var(--accent); }
+
+    /* Тултип-инструкция по клавишам */
+    .hint { margin: 10px auto 0; text-align: center; color: #8a93a5; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>Слайдер изображений — vanilla JS</h1>
+    <section class="slider" aria-label="Галерея изображений">
+      <button class="nav prev" aria-label="Предыдущее изображение" title="← Стрелка влево">&#8592;</button>
+      <div class="viewport" id="viewport">
+        <img id="slide" alt="Текущее изображение галереи" />
+      </div>
+      <button class="nav next" aria-label="Следующее изображение" title="→ Стрелка вправо">&#8594;</button>
+    </section>
+    <p id="counter" class="counter" aria-live="polite">—</p>
+    <div id="dots" class="dots" aria-hidden="true"></div>
+    <p class="hint">Управление: кнопки «← / →», клики по стрелкам, свайп по изображению (на тач‑устройствах).</p>
+  </main>
+
+  <script>
+    // Массив изображений: можно заменить на свои локальные файлы ./img/1.jpg и т.д.
+    const images = [
+      'https://images.unsplash.com/photo-1469474968028-56623f02e42e',
+      'https://images.unsplash.com/photo-1519681393784-d120267933ba',
+      'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee',
+      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e',
+      'https://images.unsplash.com/photo-1501785888041-af3ef285b470'
+    ];
+
+    // Элементы UI
+    const elImg = document.getElementById('slide');
+    const elCounter = document.getElementById('counter');
+    const elDots = document.getElementById('dots');
+    const btnPrev = document.querySelector('.prev');
+    const btnNext = document.querySelector('.next');
+    const viewport = document.getElementById('viewport');
+
+    // Состояние
+    let index = 0;
+
+    // Отрисовка точек
+    function renderDots() {
+      elDots.innerHTML = '';
+      images.forEach((_, i) => {
+        const d = document.createElement('div');
+        d.className = 'dot' + (i === index ? ' active' : '');
+        elDots.appendChild(d);
+      });
+    }
+
+    // Префетч следующего и предыдущего изображений (ускоряет переключение)
+    const cache = new Map();
+    function prefetch(i) {
+      const url = images[(i + images.length) % images.length] + '?auto=format&fit=crop&w=1280&q=60';
+      if (cache.has(url)) return;
+      const img = new Image();
+      img.src = url; // браузер закеширует
+      cache.set(url, true);
+    }
+
+    // Показ по индексу (с зацикливанием)
+    function show(i) {
+      index = (i + images.length) % images.length;
+      const url = images[index] + '?auto=format&fit=crop&w=1280&q=60';
+      elImg.src = url;
+      elImg.loading = 'eager';
+      elImg.decoding = 'async';
+      elCounter.textContent = `Изображение ${index + 1} из ${images.length}`;
+      renderDots();
+      // Префетчим соседей
+      prefetch(index + 1);
+      prefetch(index - 1);
+    }
+
+    // Слушатели
+    btnPrev.addEventListener('click', () => show(index - 1));
+    btnNext.addEventListener('click', () => show(index + 1));
+
+    // Клавиатура
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') show(index - 1);
+      if (e.key === 'ArrowRight') show(index + 1);
+    });
+
+    // Свайпы (pointer события)
+    let startX = null, startY = null, isPointer = false;
+    const THRESHOLD = 40; // пикселей для распознавания свайпа
+
+    viewport.addEventListener('pointerdown', (e) => {
+      isPointer = true; startX = e.clientX; startY = e.clientY;
+    });
+    viewport.addEventListener('pointerup', (e) => {
+      if (!isPointer) return; isPointer = false;
+      const dx = e.clientX - startX; const dy = e.clientY - startY;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > THRESHOLD) {
+        if (dx < 0) show(index + 1); else show(index - 1);
+      }
+    });
+    viewport.addEventListener('pointercancel', () => { isPointer = false; });
+
+    // Обработка ошибок загрузки изображения
+    elImg.addEventListener('error', () => {
+      elImg.alt = 'Ошибка загрузки изображения';
+      elImg.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 338">
+          <rect width="600" height="338" fill="#eef2f7"/>
+          <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#94a3b8" font-family="sans-serif" font-size="20">Image not available</text>
+        </svg>`
+      );
+    });
+
+    // Инициализация
+    renderDots();
+    show(0);
+  </script>
+</body>
+</html>
